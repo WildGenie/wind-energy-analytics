@@ -56,14 +56,14 @@ class ExpectedPower:
 
         # get data points during normal operating conditions (filtered data)
         self.normal_df, _ = pc_filter.process()
-        
+
         # get unique turbine names in training data
         self.turbine_names = self.normal_df[self.turbine_label].unique()
-        
+
         # instantiate a dictionary to store prediction functions and max power for each turbine
-        self.pred_funcs_dict = dict()
-        self.max_power_dict = dict() 
-        
+        self.pred_funcs_dict = {}
+        self.max_power_dict = {} 
+
         for turbine_name in self.turbine_names:
             # extract filterd data for a single turbine
             normal_temp_df = self.normal_df[self.normal_df.Wind_turbine_name == turbine_name].copy()
@@ -78,10 +78,10 @@ class ExpectedPower:
                 binned_df = binning_func(normal_temp_df, self.windspeed_label, self.power_label, self.bin_interval)
                 # create turbine-level interpolation function for estimating expected power
                 f = interp1d(binned_df.windspeed_bin_median, binned_df.pwr_bin_mean, kind=self.kind, fill_value="extrapolate")
-                
+
             self.pred_funcs_dict[turbine_name] = f
             self.max_power_dict[turbine_name] = binned_df.pwr_bin_mean.round().max()
-            
+
         return self
         
        

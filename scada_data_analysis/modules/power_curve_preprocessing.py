@@ -119,37 +119,49 @@ class PowerCurveFiltering:
         """
 
         no_dt_per_turbine_df = self.no_dt_per_turbine_df.reset_index().copy()
-        
+
         if 'windspeed_bin' not in no_dt_per_turbine_df.columns:
             max_windspeed = int(max(no_dt_per_turbine_df[self.windspeed_label]))
-            windspeed_bins = pd.IntervalIndex.from_tuples([(round(self.bin_interval*a, 2),
-                                                            round((self.bin_interval*a)+self.bin_interval, 2))\
-                                                                for a in range(0, 2*max_windspeed+1)])
+            windspeed_bins = pd.IntervalIndex.from_tuples(
+                [
+                    (
+                        round(self.bin_interval * a, 2),
+                        round((self.bin_interval * a) + self.bin_interval, 2),
+                    )
+                    for a in range(2 * max_windspeed + 1)
+                ]
+            )
             no_dt_per_turbine_df.loc[:, 'windspeed_bin'] = pd.cut(no_dt_per_turbine_df[self.windspeed_label], bins=windspeed_bins)
-            
+
         if self.filter_cycle == 0:
             print("Number of iterative steps cannot be less than 1, filter_cycle set to 1!")
             self.filter_cycle = 1
-        
+
         for _ in range(int(self.filter_cycle)):
             
             binned_turb_df = binning_func(no_dt_per_turbine_df, self.windspeed_label, self.power_label, self.bin_interval)
-            
-            if set(no_dt_per_turbine_df.columns).issuperset(set(['windspeed_bin_median', 'pwr_bin_mean', 'pwr_bin_std'])):
+
+            if set(no_dt_per_turbine_df.columns).issuperset(
+                {'windspeed_bin_median', 'pwr_bin_mean', 'pwr_bin_std'}
+            ):
                 no_dt_per_turbine_df.drop(['windspeed_bin_median', 'pwr_bin_mean', 'pwr_bin_std'], axis=1, inplace=True)
-                
+
             no_dt_per_turbine_df = pd.merge(no_dt_per_turbine_df, binned_turb_df, how='left', on='windspeed_bin')
-            
+
             no_dt_per_turbine_df.loc[:, 'pwr_low_thresh'] = no_dt_per_turbine_df['pwr_bin_mean'] - self.z_coeff*no_dt_per_turbine_df['pwr_bin_std']
-            no_dt_per_turbine_df.loc[:, 'pwr_low_thresh'] = no_dt_per_turbine_df['pwr_low_thresh'].apply(lambda x: 0 if x < 0 else x)
+            no_dt_per_turbine_df.loc[:, 'pwr_low_thresh'] = no_dt_per_turbine_df[
+                'pwr_low_thresh'
+            ].apply(lambda x: max(x, 0))
 
             no_dt_per_turbine_df.loc[:, 'pwr_high_thresh'] = no_dt_per_turbine_df['pwr_bin_mean'] + self.z_coeff*no_dt_per_turbine_df['pwr_bin_std']
-            no_dt_per_turbine_df.loc[:, 'pwr_high_thresh'] = no_dt_per_turbine_df['pwr_high_thresh'].apply(lambda x: 0 if x < 0 else x)
+            no_dt_per_turbine_df.loc[:, 'pwr_high_thresh'] = no_dt_per_turbine_df[
+                'pwr_high_thresh'
+            ].apply(lambda x: max(x, 0))
 
             no_dt_per_turbine_df = no_dt_per_turbine_df[(no_dt_per_turbine_df[self.power_label] > no_dt_per_turbine_df.pwr_low_thresh) &\
-                                   (no_dt_per_turbine_df[self.power_label] < no_dt_per_turbine_df.pwr_high_thresh) |\
-                                   (no_dt_per_turbine_df[self.windspeed_label] < self.cut_in_speed)]
-        
+                                       (no_dt_per_turbine_df[self.power_label] < no_dt_per_turbine_df.pwr_high_thresh) |\
+                                       (no_dt_per_turbine_df[self.windspeed_label] < self.cut_in_speed)]
+
         return no_dt_per_turbine_df['index'].tolist()
     
 if __name__ == "__main__":
