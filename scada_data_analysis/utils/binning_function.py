@@ -16,20 +16,26 @@ def binning_func(turbine_data, windspeed_label, power_label, bin_interval=0.5):
     """
     turb_df = turbine_data.copy()
     max_windspeed = int(max(turb_df[windspeed_label]))
-    
-    windspeed_bins = pd.IntervalIndex.from_tuples([(round(bin_interval*a, 2),
-                                                    round((bin_interval*a)+bin_interval, 2))\
-                                                        for a in range(0, 2*max_windspeed+1)])
-    
+
+    windspeed_bins = pd.IntervalIndex.from_tuples(
+        [
+            (
+                round(bin_interval * a, 2),
+                round((bin_interval * a) + bin_interval, 2),
+            )
+            for a in range(2 * max_windspeed + 1)
+        ]
+    )
+
     turb_df.loc[:, 'windspeed_bin'] = pd.cut(turb_df[windspeed_label], bins=windspeed_bins)
-    
+
     binned_turb_df = turb_df.groupby('windspeed_bin', as_index=False)[[windspeed_label,
                                                                         power_label]].agg({windspeed_label: 'median',
                                                                         power_label: ['mean', 'std']},
                                                                         as_index=False).dropna(subset=[(power_label,
                                                                         'mean')]).fillna({(power_label,
                                                                                             'std'): 0}).reset_index(drop=True)
-    
+
     binned_turb_df.columns = ['windspeed_bin', 'windspeed_bin_median', 'pwr_bin_mean', 'pwr_bin_std']
-    
+
     return binned_turb_df
